@@ -53,19 +53,29 @@ void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
         *opbtn |= 0x02; /* Service */
     }
 
-    if (GetAsyncKeyState(chuni_io_cfg.vk_ir)) {
-        if (chuni_io_hand_pos < 6) {
-            chuni_io_hand_pos++;
+    if (chuni_io_cfg.vk_ir_emu) {
+        // Use emulated AIR
+        if (GetAsyncKeyState(chuni_io_cfg.vk_ir_emu)) {
+            if (chuni_io_hand_pos < 6) {
+                chuni_io_hand_pos++;
+            }
+        } else {
+            if (chuni_io_hand_pos > 0) {
+                chuni_io_hand_pos--;
+            }
+        }
+
+        for (i = 0 ; i < 6 ; i++) {
+            if (chuni_io_hand_pos > i) {
+                *beams |= (1 << i);
+            }
         }
     } else {
-        if (chuni_io_hand_pos > 0) {
-            chuni_io_hand_pos--;
-        }
-    }
-
-    for (i = 0 ; i < 6 ; i++) {
-        if (chuni_io_hand_pos > i) {
-            *beams |= (1 << i);
+        // Use actual AIR
+        for (i = 0 ; i < 6 ; i++) {
+            if (GetAsyncKeyState(chuni_io_cfg.vk_ir[i]) & 0x8000) {
+                *beams |= (1 << i);
+            }
         }
     }
 }

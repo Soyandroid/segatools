@@ -17,6 +17,10 @@ static const int chuni_io_default_cells[] = {
     'S', 'S', 'S', 'S',
 };
 
+static const int chuni_io_default_ir[] = {
+    '4', '5', '6', '7', '8', '9'
+};
+
 void chuni_io_config_load(
         struct chuni_io_config *cfg,
         const wchar_t *filename)
@@ -30,7 +34,16 @@ void chuni_io_config_load(
     cfg->vk_test = GetPrivateProfileIntW(L"io3", L"test", '1', filename);
     cfg->vk_service = GetPrivateProfileIntW(L"io3", L"service", '2', filename);
     cfg->vk_coin = GetPrivateProfileIntW(L"io3", L"coin", '3', filename);
-    cfg->vk_ir = GetPrivateProfileIntW(L"io3", L"ir", VK_SPACE, filename);
+    cfg->vk_ir_emu = GetPrivateProfileIntW(L"io3", L"ir", VK_SPACE, filename);
+
+    for (i = 0 ; i < 6 ; i++) {
+        swprintf_s(key, _countof(key), L"ir%i", i + 1);
+        cfg->vk_ir[i] = GetPrivateProfileIntW(
+                L"ir",
+                key,
+                chuni_io_default_ir[i],
+                filename);
+    }
 
     for (i = 0 ; i < 32 ; i++) {
         swprintf_s(key, _countof(key), L"cell%i", i + 1);
