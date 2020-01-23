@@ -3,6 +3,7 @@
 #include <process.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "chuniio/chuniio.h"
 #include "chuniio/config.h"
@@ -15,6 +16,16 @@ static uint8_t chuni_io_hand_pos;
 static HANDLE chuni_io_slider_thread;
 static bool chuni_io_slider_stop_flag;
 static struct chuni_io_config chuni_io_cfg;
+
+static FILE *logfd;
+static HANDLE led_fd;
+static volatile enum {
+    INVALID = 0,
+    AVAILABLE,
+    BUSY
+} led_status;
+static uint8_t led_colors[48];
+static volatile uint32_t led_colors_hash, led_colors_prevhash;
 
 HRESULT chuni_io_jvs_init(void)
 {
@@ -73,6 +84,56 @@ void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
 void chuni_io_jvs_set_coin_blocker(bool open)
 {}
 
+static void chuni_io_led_init(struct chuni_io_config *cfg)
+{
+    led_status = INVALID;
+    logfd = fopen("ledlog.txt", "a");
+    fprintf(logfd, "LED Init called\n");
+    if (!cfg->led_port) {
+        return;
+    }
+    char comname[8];
+    snprintf(comname, sizeof(comname), "COM%d", cfg->led_port);
+    led_fd = CreateFile(comname,
+                        GENERIC_READ | GENERIC_WRITE,
+                        0,
+                        0,
+                        OPEN_EXISTING,
+                        FILE_ATTRIBUTE_NORMAL,
+                        0);
+    if (led_fd == INVALID_HANDLE_VALUE) {
+        fprintf(logfd, "Cannot open LED COM port: %ld\n", GetLastError());
+        return;
+    }
+    // Set COM parameters
+    DCB dcbSerialParams = {0};
+    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+    if (!GetCommState(led_fd, &dcbSerialParams)) {
+        fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
+        return;
+    }
+    dcbSerialParams.BaudRate = cfg->led_rate;
+    dcbSerialParams.ByteSize = 8;
+    dcbSerialParams.StopBits = ONESTOPBIT;
+    dcbSerialParams.Parity = NOPARITY;
+    if (!SetCommState(led_fd, &dcbSerialParams)) {
+        fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
+        return;
+    }
+    // Set COM timeout to nonblocking reads
+    COMMTIMEOUTS timeouts = {0};
+    timeouts.ReadIntervalTimeout = MAXDWORD;
+    timeouts.ReadTotalTimeoutConstant = 0;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = 0;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+    if (!SetCommTimeouts(led_fd, &timeouts)) {
+        fprintf(logfd, "Cannot set LED COM timeouts: %ld\n", GetLastError());
+        return;
+    }
+    led_status = AVAILABLE;
+}
+
 HRESULT chuni_io_slider_init(void)
 {
     return S_OK;
@@ -109,6 +170,34 @@ void chuni_io_slider_stop(void)
 
 void chuni_io_slider_set_leds(const uint8_t *rgb)
 {
+    int i;
+    if (led_status == INVALID) {
+        return;
+    }
+    for (int i = 0; i < 16; i++) {
+        led_colors[i*3+0] = rgb[i*6+1];
+        led_colors[i*3+1] = rgb[i*6+2];
+        led_colors[i*3+2] = rgb[i*6+0];
+    }
+    uint32_t hash = 0x811c9dc5;
+    for (i = 0; i < 96; i++) {
+        hash ^= rgb[i];
+        hash *= 0x01000193;
+    }
+    if (led_colors_hash != hash) {
+        led_colors_hash = hash;
+        // FILE *f = fopen("ledtrace.txt", "a");
+        // fprintf(f, "Req: ");
+        // for (i = 0; i < 32; i++) {
+        //     fprintf(f, "%02x%02x%02x ", rgb[i*3+0], rgb[i*3+1], rgb[i*3+2]);
+        // }
+        // fprintf(f, "\nResp: ");
+        // for (i = 0; i < 16; i++) {
+        //     fprintf(f, "%02x%02x%02x ", led_colors[i*3+0], led_colors[i*3+1], led_colors[i*3+2]);
+        // }
+        // fprintf(f, "\n");
+        // fclose(f);
+    }
 }
 
 static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
@@ -116,8 +205,13 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
     chuni_io_slider_callback_t callback;
     uint8_t pressure[32];
     size_t i;
+    DWORD n;
+    ssize_t ret;
+    char buf;
 
     callback = ctx;
+
+    chuni_io_led_init(&chuni_io_cfg);
 
     while (!chuni_io_slider_stop_flag) {
         for (i = 0 ; i < _countof(pressure) ; i++) {
@@ -129,7 +223,44 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
         }
 
         callback(pressure);
+
+        // Write LED colors to COM if there are pending requests
+        if (led_status != INVALID) {
+            ret = ReadFile(led_fd, &buf, 1, &n, NULL);
+            if (!ret) {
+                fprintf(logfd, "LED COM read failed: %ld\n", GetLastError());
+                led_status = INVALID;
+            } else if (n == 1) {
+                if (buf == 'A') { // ACK. Safe to send
+                    led_status = AVAILABLE;
+                    // fprintf(logfd, "ACK'ed\n");
+                }
+            }
+            if (led_colors_hash != led_colors_prevhash) {
+                if (led_status == AVAILABLE) {
+                    // fprintf(logfd, "Flush: ");
+                    // for (i = 0; i < 16; i++) {
+                    //     fprintf(logfd, "%02x%02x%02x ", led_colors[i*3+0], led_colors[i*3+1], led_colors[i*3+2]);
+                    // }
+                    // fprintf(logfd, "\n");
+                    ret = WriteFile(led_fd, led_colors, sizeof(led_colors), &n, NULL);
+                    if (!ret || n != sizeof(led_colors)) {
+                        fprintf(logfd, "LED COM Write failed: %ld\n", GetLastError());
+                        led_status = INVALID;
+                    } else {
+                        // OK. Set expecting ACK. Reset update flag
+                        led_status = BUSY;
+                        led_colors_prevhash = led_colors_hash;
+                    }
+                }
+            }
+        }
+
         Sleep(1);
+    }
+
+    if (led_fd != INVALID_HANDLE_VALUE) {
+        CloseHandle(led_fd);
     }
 
     return 0;
