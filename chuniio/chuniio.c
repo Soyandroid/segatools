@@ -17,7 +17,22 @@ static HANDLE chuni_io_slider_thread;
 static bool chuni_io_slider_stop_flag;
 static struct chuni_io_config chuni_io_cfg;
 
-static FILE *logfd;
+/**
+ *  COM-port LED protocol
+ *
+ *  I made up this simple protocol as I implemented on my custom hardware. I
+ *  used an Arduino Leonardo to send keys over HID and receive LED over COM.
+ *  The host sends 48 bytes over serial to the slider, and expects one byte
+ *  of ACK. To avoid/mitigate loss in serial communication, the host must not
+ *  send without receiving ACK because the device may mask interrupts when
+ *  writing timing-sensitive 3-pin LED strip (e.g., WS2812B). The device may
+ *  send duplicate ACKs to mitigate potentially lost ACKs. ACK indicates that
+ *  the device is receiving interrupts and has empty receiving buffer, expecting
+ *  a full 48-byte request. Encoding is explained below.
+ *  Request (H2D): 48 bytes. 16 colors from right to left. Each color is in RGB.
+ *  Response (D2H): 1 byte. Character 'A' (0x41).
+ */
+// static FILE *logfd;
 static HANDLE led_fd;
 static volatile enum {
     INVALID = 0,
@@ -87,8 +102,10 @@ void chuni_io_jvs_set_coin_blocker(bool open)
 static void chuni_io_led_init(struct chuni_io_config *cfg)
 {
     led_status = INVALID;
-    logfd = fopen("ledlog.txt", "a");
-    fprintf(logfd, "LED Init called\n");
+    // dprintf does not seem to work here... If you need to print debug info,
+    // uncomment lines that contains logfd
+    // logfd = fopen("ledlog.txt", "a");
+    // fprintf(logfd, "LED Init called\n");
     if (!cfg->led_port) {
         return;
     }
@@ -102,14 +119,14 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
                         FILE_ATTRIBUTE_NORMAL,
                         0);
     if (led_fd == INVALID_HANDLE_VALUE) {
-        fprintf(logfd, "Cannot open LED COM port: %ld\n", GetLastError());
+        // fprintf(logfd, "Cannot open LED COM port: %ld\n", GetLastError());
         return;
     }
     // Set COM parameters
     DCB dcbSerialParams = {0};
     dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
     if (!GetCommState(led_fd, &dcbSerialParams)) {
-        fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
+        // fprintf(logfd, "Cannot get LED COM port parameters: %ld\n", GetLastError());
         return;
     }
     dcbSerialParams.BaudRate = cfg->led_rate;
@@ -117,7 +134,7 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     dcbSerialParams.StopBits = ONESTOPBIT;
     dcbSerialParams.Parity = NOPARITY;
     if (!SetCommState(led_fd, &dcbSerialParams)) {
-        fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
+        // fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
         return;
     }
     // Set COM timeout to nonblocking reads
@@ -128,7 +145,7 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     timeouts.WriteTotalTimeoutConstant = 0;
     timeouts.WriteTotalTimeoutMultiplier = 0;
     if (!SetCommTimeouts(led_fd, &timeouts)) {
-        fprintf(logfd, "Cannot set LED COM timeouts: %ld\n", GetLastError());
+        // fprintf(logfd, "Cannot set LED COM timeouts: %ld\n", GetLastError());
         return;
     }
     led_status = AVAILABLE;
@@ -174,11 +191,14 @@ void chuni_io_slider_set_leds(const uint8_t *rgb)
     if (led_status == INVALID) {
         return;
     }
+    // Remap GBR to RGB
     for (int i = 0; i < 16; i++) {
         led_colors[i*3+0] = rgb[i*6+1];
         led_colors[i*3+1] = rgb[i*6+2];
         led_colors[i*3+2] = rgb[i*6+0];
     }
+    // Detect change in current LED colors by simple FNV hash
+    // Only send colors to COM port if changed to reduce bus load (useful?)
     uint32_t hash = 0x811c9dc5;
     for (i = 0; i < 96; i++) {
         hash ^= rgb[i];
@@ -186,18 +206,8 @@ void chuni_io_slider_set_leds(const uint8_t *rgb)
     }
     if (led_colors_hash != hash) {
         led_colors_hash = hash;
-        // FILE *f = fopen("ledtrace.txt", "a");
-        // fprintf(f, "Req: ");
-        // for (i = 0; i < 32; i++) {
-        //     fprintf(f, "%02x%02x%02x ", rgb[i*3+0], rgb[i*3+1], rgb[i*3+2]);
-        // }
-        // fprintf(f, "\nResp: ");
-        // for (i = 0; i < 16; i++) {
-        //     fprintf(f, "%02x%02x%02x ", led_colors[i*3+0], led_colors[i*3+1], led_colors[i*3+2]);
-        // }
-        // fprintf(f, "\n");
-        // fclose(f);
     }
+    // Actual COM write will happen in slider thread below
 }
 
 static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
@@ -228,24 +238,18 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
         if (led_status != INVALID) {
             ret = ReadFile(led_fd, &buf, 1, &n, NULL);
             if (!ret) {
-                fprintf(logfd, "LED COM read failed: %ld\n", GetLastError());
+                // fprintf(logfd, "LED COM read failed: %ld\n", GetLastError());
                 led_status = INVALID;
             } else if (n == 1) {
                 if (buf == 'A') { // ACK. Safe to send
                     led_status = AVAILABLE;
-                    // fprintf(logfd, "ACK'ed\n");
                 }
             }
             if (led_colors_hash != led_colors_prevhash) {
                 if (led_status == AVAILABLE) {
-                    // fprintf(logfd, "Flush: ");
-                    // for (i = 0; i < 16; i++) {
-                    //     fprintf(logfd, "%02x%02x%02x ", led_colors[i*3+0], led_colors[i*3+1], led_colors[i*3+2]);
-                    // }
-                    // fprintf(logfd, "\n");
                     ret = WriteFile(led_fd, led_colors, sizeof(led_colors), &n, NULL);
                     if (!ret || n != sizeof(led_colors)) {
-                        fprintf(logfd, "LED COM Write failed: %ld\n", GetLastError());
+                        // fprintf(logfd, "LED COM Write failed: %ld\n", GetLastError());
                         led_status = INVALID;
                     } else {
                         // OK. Set expecting ACK. Reset update flag
