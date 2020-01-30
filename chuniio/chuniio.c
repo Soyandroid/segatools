@@ -72,10 +72,12 @@ void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
         }
     } else {
         // Use actual AIR
-        for (i = 0 ; i < 6 ; i++) {
-            if (GetAsyncKeyState(chuni_io_cfg.vk_ir[i]) & 0x8000) {
-                *beams |= (1 << i);
-            }
+        // IR format is beams[5:0] = {b5,b6,b3,b4,b1,b2};
+        for (i = 0 ; i < 3 ; i++) {
+            if (GetAsyncKeyState(chuni_io_cfg.vk_ir[i*2]) & 0x8000)
+                *beams |= (1 << (i*2+1));
+            if (GetAsyncKeyState(chuni_io_cfg.vk_ir[i*2+1]) & 0x8000)
+                *beams |= (1 << (i*2));
         }
     }
 }
