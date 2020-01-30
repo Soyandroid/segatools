@@ -101,7 +101,7 @@ void chuni_io_slider_start(chuni_io_slider_callback_t callback);
 void chuni_io_slider_stop(void);
 
 /* Update the RGB lighting on the slider. A pointer to an array of 32 * 3 = 96
-   bytes is supplied. Each 3 bytes is a color in GBR. Colors are ordered from
+   bytes is supplied. Each 3 bytes is a color in BRG. Colors are ordered from
    right to left, alternating between key and divider:
    Bytes 0-2: Key 16 (rightmost)
    Bytes 3-5: Divider between key 15 and key 16
@@ -110,6 +110,6 @@ void chuni_io_slider_stop(void);
    Bytes 12-14: Key 14
    ...
    Bytes 90-92: Key 1 (leftmost)
-   Bytes 93-95: 00 00 00 */
+   Bytes 93-95: 00 00 00 (as I observed) */
 
 void chuni_io_slider_set_leds(const uint8_t *rgb);
