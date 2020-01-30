@@ -53,4 +53,7 @@ void chuni_io_config_load(
                 chuni_io_default_cells[i],
                 filename);
     }
+
+    cfg->led_port = GetPrivateProfileIntW(L"led", L"port", 0, filename);
+    cfg->led_rate = GetPrivateProfileIntW(L"led", L"rate", 1000000, filename);
 }
