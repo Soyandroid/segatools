@@ -256,6 +256,10 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
             } else if (n == 1) {
                 if (buf == 'A') { // ACK. Safe to send
                     led_status = AVAILABLE;
+                } else if (buf == 'N') { // NAK. Resend immediately
+                    led_status = AVAILABLE;
+                    led_colors_prevhash = ~led_colors_hash;
+                    // fprintf(logfd, "LED Device NAK\n");
                 }
             }
             if (led_colors_hash != led_colors_prevhash) {
