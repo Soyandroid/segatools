@@ -32,8 +32,8 @@ static struct chuni_io_config chuni_io_cfg;
  *  Request (H2D): 48 bytes. 16 colors from right to left. Each color is in RGB.
  *  Response (D2H): 1 byte. Character 'A' (0x41).
  */
-static FILE *logfd;
-static HANDLE led_fd;
+static FILE *logfd = NULL;
+static HANDLE led_fd = INVALID_HANDLE_VALUE;
 static volatile enum {
     INVALID = 0,
     AVAILABLE,
@@ -123,6 +123,9 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     }
     char comname[8];
     snprintf(comname, sizeof(comname), "COM%d", cfg->led_port);
+    if (led_fd != INVALID_HANDLE_VALUE) {
+        CloseHandle(led_fd);
+    }
     led_fd = CreateFile(comname,
                         GENERIC_READ | GENERIC_WRITE,
                         0,
@@ -139,7 +142,7 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
     if (!GetCommState(led_fd, &dcbSerialParams)) {
         fprintf(logfd, "Cannot get LED COM port parameters: %ld\n", GetLastError());
-        return;
+        goto fail_cleanup;
     }
     dcbSerialParams.BaudRate = cfg->led_rate;
     dcbSerialParams.ByteSize = 8;
@@ -147,7 +150,7 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     dcbSerialParams.Parity = NOPARITY;
     if (!SetCommState(led_fd, &dcbSerialParams)) {
         fprintf(logfd, "Cannot set LED COM port parameters: %ld\n", GetLastError());
-        return;
+        goto fail_cleanup;
     }
     // Set COM timeout to nonblocking reads
     COMMTIMEOUTS timeouts = {0};
@@ -158,10 +161,26 @@ static void chuni_io_led_init(struct chuni_io_config *cfg)
     timeouts.WriteTotalTimeoutMultiplier = 0;
     if (!SetCommTimeouts(led_fd, &timeouts)) {
         fprintf(logfd, "Cannot set LED COM timeouts: %ld\n", GetLastError());
-        return;
+        goto fail_cleanup;
     }
+
+    if (!EscapeCommFunction(led_fd, SETDTR)) {
+        fprintf(logfd, "Cannot set LED COM DTR%ld\n", GetLastError());
+        goto fail_cleanup;
+    }
+
+    if (!EscapeCommFunction(led_fd, SETRTS)) {
+        fprintf(logfd, "Cannot set LED COM RTS%ld\n", GetLastError());
+        goto fail_cleanup;
+    }
+
     led_status = BUSY; // Wait for ACK
     fprintf(logfd, "LED COM connected.\n");
+    return;
+
+fail_cleanup:
+    CloseHandle(led_fd);
+    led_fd = INVALID_HANDLE_VALUE;
 }
 
 HRESULT chuni_io_slider_init(void)
@@ -282,6 +301,7 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
 
     if (led_fd != INVALID_HANDLE_VALUE) {
         CloseHandle(led_fd);
+        led_fd = INVALID_HANDLE_VALUE;
     }
 
     return 0;
