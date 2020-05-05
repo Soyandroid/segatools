@@ -217,7 +217,7 @@ static int aime_io_read_nfclist(
     startinfo.hStdOutput = cpout_w;
     startinfo.hStdInput = cpout_r;
     startinfo.dwFlags |= STARTF_USESTDHANDLES;
-    wcscpy(cmdline, L"nfc-list -t 2");
+    wcscpy(cmdline, L"nfc-list");
 
     success = CreateProcessW(
         path,          // binary path
@@ -242,18 +242,18 @@ static int aime_io_read_nfclist(
         return -1;
     }
     buf[n] = '\0';
-    ptr = strstr(buf, "ID (NFCID2): ");
+    ptr = strstr(buf, "ID (NFCID");
     if (!ptr) {
         return 0;
     }
 
-    // Felica found
+    // Found
     ptr += 13;
 
     memset(bytes, 0, nbytes);
 
     for (i = 0 ; i < nbytes ; i++) {
-        r = sscanf(ptr, "%02X ", &v);
+        r = sscanf(ptr, "%02X  ", &v);
         if (r != 1) {
             dprintf("AimeIO DLL: %S: sscanf[%i] failed: %i\n",
                     path,
@@ -262,6 +262,9 @@ static int aime_io_read_nfclist(
             return -1;
         }
         bytes[i] = v;
+        if (ptr[4] == '\r' || ptr[4] == '\n') {
+            break;
+        }
         ptr += 4;
     }
 
