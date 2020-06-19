@@ -266,7 +266,7 @@ static HRESULT sg_nfc_poll_aime(
         struct sg_nfc *nfc,
         struct sg_nfc_poll_mifare *mifare)
 {
-    uint8_t luid[10];
+    uint8_t luid[32];
     HRESULT hr;
 
     /* Call backend */
@@ -291,11 +291,16 @@ static HRESULT sg_nfc_poll_aime(
 
     /* Initialize MIFARE IC emulator */
 
+    /*
     hr = aime_card_populate(&nfc->mifare, luid, sizeof(luid));
 
     if (FAILED(hr)) {
         return hr;
     }
+    */
+
+    // Workaround mifare checksum: read from file
+    memcpy(nfc->mifare.sectors[0].blocks[1].bytes, luid, sizeof(luid));
 
     return S_OK;
 }

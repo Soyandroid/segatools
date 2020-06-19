@@ -22,7 +22,7 @@ struct aime_io_config {
 };
 
 static struct aime_io_config aime_io_cfg;
-static uint8_t aime_io_aime_id[10];
+static uint8_t aime_io_aime_id[32];
 static uint8_t aime_io_felica_id[8];
 static bool aime_io_aime_id_present;
 static bool aime_io_felica_id_present;
