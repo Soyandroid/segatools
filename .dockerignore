@@ -1,0 +1,8 @@
+# Ignore Git data
+.git
+.gitignore
+
+# Ignore built files from previous builds
+_build32/
+_build64/
+_zip/
