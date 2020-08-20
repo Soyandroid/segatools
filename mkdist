@@ -16,6 +16,20 @@ cp  pki/billing.pub \
     pki/ca.crt \
     _zip/chuni/DEVICE
 
+mkdir -p _zip/diva/DEVICE
+
+cp  _build64/subprojects/capnhook/inject/inject.exe \
+    _build64/aimeio/aimeio.dll \
+    _build64/divaio/divaio.dll \
+    _build64/divahook/divahook.dll \
+    dist/diva/segatools.ini \
+    dist/diva/start.bat \
+    _zip/diva/
+
+cp  pki/billing.pub \
+    pki/ca.crt \
+    _zip/diva/DEVICE
+
 mkdir -p _zip/idz/DEVICE
 
 cp  _build64/subprojects/capnhook/inject/inject.exe \
@@ -30,5 +44,5 @@ cp  pki/billing.pub \
     pki/ca.crt \
     _zip/idz/DEVICE
 
-strip _zip/{chuni,idz}/*.{exe,dll}
+strip _zip/{chuni,diva,idz}/*.{exe,dll}
 
