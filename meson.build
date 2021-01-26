@@ -21,6 +21,8 @@ if meson.get_compiler('c').get_id() != 'msvc'
         '-Wl,--exclude-all-symbols',
         '-Wl,--gc-sections',
         '-static-libgcc',
+        '-lsetupapi',
+        '-lhid',
         language: 'c',
     )
 endif

@@ -9,6 +9,8 @@ aimeio_dll = shared_library(
         util_lib,
     ],
     sources : [
-        'aimeio.c',
+        'hid.c',
+        'window.c',
+        'aimeio.c'
     ],
 )
