@@ -16,6 +16,7 @@
 struct aime_io_config {
     wchar_t aime_path[MAX_PATH];
     wchar_t felica_path[MAX_PATH];
+    bool aime_gen;
     bool felica_gen;
     uint8_t vk_scan;
 };
@@ -61,6 +62,12 @@ static void aime_io_config_read(
             L"DEVICE\\felica.txt",
             cfg->felica_path,
             _countof(cfg->felica_path),
+            filename);
+
+    cfg->aime_gen = GetPrivateProfileIntW(
+            L"aime",
+            L"aimeGen",
+            0,
             filename);
 
     cfg->felica_gen = GetPrivateProfileIntW(
@@ -162,6 +169,45 @@ static HRESULT aime_io_generate_felica(
     return S_OK;
 }
 
+static HRESULT aime_io_generate_aime(
+        const wchar_t *path,
+        uint8_t *digits,
+        size_t nbytes)
+{
+    size_t i;
+    FILE *f;
+
+    assert(path != NULL);
+    assert(digits != NULL);
+    assert(nbytes > 0);
+    nbytes = nbytes * 2;
+
+    srand(time(NULL));
+
+    for (i = 0 ; i < nbytes ; i++) {
+        digits[i] = rand() % 10;
+    }
+
+    f = _wfopen(path, L"w");
+
+    if (f == NULL) {
+        dprintf("AimeIO DLL: %S: fopen failed: %i\n", path, (int) errno);
+
+        return E_FAIL;
+    }
+
+    for (i = 0 ; i < nbytes; i++) {
+        fprintf(f, "%d", digits[i]);
+    }
+
+    fprintf(f, "\n");
+    fclose(f);
+
+    dprintf("AimeIO DLL: Generated random Aime ID\n");
+
+    return S_OK;
+}
+
 HRESULT aime_io_init(void)
 {
     aime_io_config_read(&aime_io_cfg, L".\\segatools.ini");
@@ -205,6 +251,22 @@ HRESULT aime_io_nfc_poll(uint8_t unit_no)
     if (SUCCEEDED(hr) && hr != S_FALSE) {
         aime_io_aime_id_present = true;
 
+        return S_OK;
+    }
+
+    /* Try generating AiMe IC (if enabled) */
+
+    if (aime_io_cfg.aime_gen) {
+        hr = aime_io_generate_aime(
+                aime_io_cfg.aime_path,
+                aime_io_aime_id,
+                sizeof(aime_io_aime_id));
+
+        if (FAILED(hr)) {
+            return hr;
+        }
+
+        aime_io_aime_id_present = true;
         return S_OK;
     }
 
