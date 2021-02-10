@@ -10,6 +10,7 @@
 #include "chunihook/config.h"
 #include "chunihook/jvs.h"
 #include "chunihook/slider.h"
+#include "chunihook/led1509306.h"
 
 #include "chuniio/chuniio.h"
 
@@ -33,6 +34,12 @@ static DWORD CALLBACK chuni_pre_startup(void)
     HRESULT hr;
 
     dprintf("--- Begin chuni_pre_startup ---\n");
+    
+    hr = chuni_io_main_init();
+
+    if (FAILED(hr)) {
+        return EXIT_FAILURE;
+    }
 
     /* Pin the D3D shader compiler. This makes startup much faster. */
 
@@ -77,6 +84,12 @@ static DWORD CALLBACK chuni_pre_startup(void)
         return EXIT_FAILURE;
     }
 
+    hr = led1509306_hook_init(&chuni_hook_cfg.led1509306);
+
+    if (FAILED(hr)) {
+        return EXIT_FAILURE;
+    }
+
     hr = sg_reader_hook_init(&chuni_hook_cfg.aime, 12);
 
     if (FAILED(hr)) {
@@ -109,6 +122,6 @@ BOOL WINAPI DllMain(HMODULE mod, DWORD cause, void *ctx)
     if (!SUCCEEDED(hr)) {
         dprintf("Failed to hijack process startup: %x\n", (int) hr);
     }
-
+    
     return SUCCEEDED(hr);
 }

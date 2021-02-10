@@ -1,0 +1,124 @@
+Reverse-engineered 15093-06 protocol
+(somewhatlurker)
+
+
+The host and device seem to communicate using data frames similar to (but not
+the same as) jvs and the slider protocol.
+
+In general, the host will issue a command to the device and the device will
+respond using the same command number.
+The response will have source and destination addresses swapped of course.
+
+The host can request for future packets to not have responses, though this may
+only affect certain commands such as LED data. Just something to be aware of
+when implementing the system.
+
+
+Basic packet format: `[sync] [dest] [src] [len] [data] [sum]`
+sync: 0xe0
+dest: destination address
+src:  source address
+len:  length of data
+data: payload
+sum:  sum of all prior bytes except sync
+
+When the host requests something from/sends something to the board, [data] will
+be `[cmd] ...`.
+cmd: command number
+(followed by arbitrary additional data if applicable)
+
+When the board responds, [data] will be `[status] [cmd] [report] ...`.
+status: status code
+        (1: Ok, 2: SumError, 3: ParityError, 4: FramingError, 5: OverRunError,
+        6: RecvBfOverflow)
+cmd:    command number (same as the one from request)
+report: report status code
+        (1: Ok, 2: Wait, 3: ReportError, 4: ReportError)
+(followed by arbitrary additional data if applicable)
+
+
+Escaping:
+Like in JVS, the sync byte and 0xd0 are reserved. To include these in data, send
+0xd0 followed by the reserved byte minus 1. (ie. `d0 cf` or `d0 df`)
+
+
+Addresses and game-specific details:
+Chunithm uses 2 for the LED boards and 1 for the host. There's two boards
+present, but they are differentiated purely by COM port (one COM10, one COM11).
+Based on wiring diagrams, I think COM10 should be for the left half of the
+marquee display (10 pixels * 5 columns) and the left partition lights (3 pixels).
+COM11 should be for the right half (6 columns) and the right partition lights.
+The marquee appears to snake strips back and forth (input of first column should
+be at the top).
+
+Ongeki seems to use 1 for the LED board and 2 for the host. It should be on
+COM3.
+I think the chain is left button (x2), lower left pillar (x7), left ring (x9),
+upper left pillar (x7), top edge (x11), upper right pillar (x7),
+right ring (x9), lower right pillar (x9), right button (x2).
+
+
+Known Commands:
+0xf0: get board info
+    -- chunithm host sends command with no additional data (`e0 02 01 01 f0 f4`)
+    -- respond with additional data `[boardno] 0a [chipno] ff [fwver] ...`,
+       boardno and chipno are strings (seems same as slider protocol)
+    -- ongeki uses 0a and ff as string terminators, not sure if that's the
+       intended use though
+    -- fwver can be found in an update filename (90 for chunithm, a0 for ongeki)
+    -- there's probably some additional bytes like for slider board info, but
+       I don't think they're important
+    -- pad strings with 0x20 (important!)
+
+0xf2: get firm sum
+    -- respond with additional data `[sum_upper] [sum_lower]`
+    -- sum can be found in an update filename (adf7 for chuni, aa53 for ongeki)
+
+0xf3: get protocol version
+    -- respond with additional data `[appli_mode] [major] [minor]`, appli_mode
+       is bool
+    -- version shouldn't matter much, but I think appli_mode should be 1
+    -- try `01 01 04`
+
+0x11: set timeout
+    -- host will send with additional data `[timeout_upper] [timeout_lower]`
+    -- respond with additional data `[timeout_upper] [timeout_lower]`
+    -- 0 disables timeout
+    -- presumably this makes the device reset if no data is sent for a certain
+       time period, or maybe the device sends some kind of heartbeat within this
+       period
+
+0x10: reset
+    -- host will send one additional byte (d9) to choose the reset code/type
+    -- respond with no additional data
+
+0xf1: get board status
+    -- shouldn't be necessary to properly implement this, but if you must...
+       host sends with additional data `[flagclear]`,
+       respond with additional data `[boardflag] [uartflag] [cmdflag] [dipsw]`
+    -- flagclear is a bool that presumably resets error flags
+    -- flags are bitfields
+    -- boardflag: `0 0 0 0 [bor] [reset] [timeout] [wdt]` (MSB first)
+    -- uartflag: `0 0 [txoverflow] [rxoverflow] [overrun] [framing] [parity] [sum]`
+    -- cmdflag: `0 0 0 0 [exe] [param] [unknown] [busy]`
+
+0x14: set disable response
+    -- host will send with additional data `[enable]`
+    -- respond with additional data `[enable]`
+    -- it looks like setting enable to true will _disable_ responses
+    -- I think this makes the device not send responses for future commands
+    -- it might only affect LED commands
+
+0x82: set led direct
+    -- host sends 66*3 bytes for rgb as additional data
+    -- respond with no additional data
+
+0x86: set led count
+    -- host sends additional data `[count]`
+    -- respond with additional data `[count]`
+    -- probably just affects the output from the board to LEDs,
+       neither chuni nor ongeki use this
+    
+0xfd: enter bootloader
+    -- no real point implementing this, just interesting
+    -- MCU might be an ATMega 32M1 btw, but I'm not sure

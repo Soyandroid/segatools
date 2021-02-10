@@ -10,5 +10,12 @@ chuniio_dll = shared_library(
         'chuniio.h',
         'config.c',
         'config.h',
+        'leddata.h',
+        'ledoutput.c',
+        'ledoutput.h',
+        'pipeimpl.c',
+        'pipeimpl.h',
+        'serialimpl.c',
+        'serialimpl.h'
     ],
 )

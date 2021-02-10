@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Initialization to be called from pre startup. Can be used to setup data that
+   will be shared by multiple other IO types/threads. */
+HRESULT chuni_io_main_init(void);
+
 /* Initialize JVS-based input. This function will be called before any other
    chuni_io_jvs_*() function calls. Errors returned from this function will
    manifest as a disconnected JVS bus.
@@ -106,3 +110,24 @@ void chuni_io_slider_stop(void);
    but the exact mapping of this lighting control buffer is still TBD. */
 
 void chuni_io_slider_set_leds(const uint8_t *rgb);
+
+/* Initialize LED strip emulation. This function will be called before any
+   other chuni_io_ledstrip_*() function calls.
+   
+   Chunithm uses two chains/boards, so board will be 0 or 1 depending on
+   which is being triggered.
+
+   All subsequent calls may originate from arbitrary threads and some may
+   overlap with each other. Ensuring synchronization inside your IO DLL is
+   your responsibility. */
+
+HRESULT chuni_io_ledstrip_init(int board);
+
+/* Update the RGB LED strips. rgb is a pointer to an array of 66 * 3 = 198
+   bytes. The majority of these are for the marquee display, but the final
+   LEDs are for the side partitions.
+   
+   Chunithm uses two chains/boards. One is on the left side and one on the
+   right side of the cab. Exact layout is TBD. */
+
+void chuni_io_ledstrip_set_leds(int board, const uint8_t *rgb);

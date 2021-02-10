@@ -6,6 +6,7 @@
 
 #include "chuniio/chuniio.h"
 #include "chuniio/config.h"
+#include "chuniio/ledoutput.h"
 
 static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx);
 
@@ -16,10 +17,25 @@ static HANDLE chuni_io_slider_thread;
 static bool chuni_io_slider_stop_flag;
 static struct chuni_io_config chuni_io_cfg;
 
-HRESULT chuni_io_jvs_init(void)
+HRESULT chuni_io_main_init(void)
 {
     chuni_io_config_load(&chuni_io_cfg, L".\\segatools.ini");
+    
+    led_init_mutex = CreateMutex(
+        NULL,              // default security attributes
+        FALSE,             // initially not owned
+        NULL);             // unnamed mutex
+    
+    if (led_init_mutex == NULL)
+    {
+        return E_FAIL;
+    }
+    
+    return S_OK;
+}
 
+HRESULT chuni_io_jvs_init(void)
+{
     return S_OK;
 }
 
@@ -52,30 +68,41 @@ void chuni_io_jvs_poll(uint8_t *opbtn, uint8_t *beams)
     if (GetAsyncKeyState(chuni_io_cfg.vk_service)) {
         *opbtn |= 0x02; /* Service */
     }
-
-    if (GetAsyncKeyState(chuni_io_cfg.vk_ir)) {
-        if (chuni_io_hand_pos < 6) {
-            chuni_io_hand_pos++;
+    
+    if(chuni_io_cfg.ir_key_enable) {
+        for (i = 0; i < 6; i++) {
+            if(GetAsyncKeyState(chuni_io_cfg.vk_ir[i]) & 0x8000) {
+                *beams |= (1 << i);
+            } else {
+                *beams &= ~(1 << i);
+            }
         }
     } else {
-        if (chuni_io_hand_pos > 0) {
-            chuni_io_hand_pos--;
+        if (GetAsyncKeyState(chuni_io_cfg.vk_ir[0])) {
+            if (chuni_io_hand_pos < 6) {
+                chuni_io_hand_pos++;
+            }
+        } else {
+            if (chuni_io_hand_pos > 0) {
+                chuni_io_hand_pos--;
+            }
         }
-    }
 
-    for (i = 0 ; i < 6 ; i++) {
-        if (chuni_io_hand_pos > i) {
-            *beams |= (1 << i);
+        for (i = 0 ; i < 6 ; i++) {
+            if (chuni_io_hand_pos > i) {
+                *beams |= (1 << i);
+            }
         }
     }
 }
+
 
 void chuni_io_jvs_set_coin_blocker(bool open)
 {}
 
 HRESULT chuni_io_slider_init(void)
 {
-    return S_OK;
+    return led_output_init(&chuni_io_cfg); // because of slider LEDs
 }
 
 void chuni_io_slider_start(chuni_io_slider_callback_t callback)
@@ -109,6 +136,7 @@ void chuni_io_slider_stop(void)
 
 void chuni_io_slider_set_leds(const uint8_t *rgb)
 {
+    led_output_update(2, rgb);
 }
 
 static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
@@ -133,4 +161,14 @@ static unsigned int __stdcall chuni_io_slider_thread_proc(void *ctx)
     }
 
     return 0;
+}
+
+HRESULT chuni_io_ledstrip_init(int board)
+{
+    return led_output_init(&chuni_io_cfg);
+}
+
+void chuni_io_ledstrip_set_leds(int board, const uint8_t *rgb)
+{
+    led_output_update(board, rgb);
 }
