@@ -36,7 +36,7 @@ void chuni_io_config_load(
     cfg->vk_test = GetPrivateProfileIntW(L"io3", L"test", '1', filename);
     cfg->vk_service = GetPrivateProfileIntW(L"io3", L"service", '2', filename);
     cfg->vk_coin = GetPrivateProfileIntW(L"io3", L"coin", '3', filename);
-    cfg->ir_key_enable = GetPrivateProfileIntW(L"io3", L"enableirkeys", '0', filename);
+    cfg->ir_key_enable = GetPrivateProfileIntW(L"io3", L"enableirkeys", 0, filename);
 
     if(cfg->ir_key_enable) {
         for (i = 0 ; i < 6 ; i++) {
