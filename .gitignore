@@ -7,3 +7,6 @@ _zip/
 
 # External dependencies
 subprojects/capnhook
+
+# Common dev tools
+.vscode/

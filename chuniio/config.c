@@ -62,14 +62,14 @@ void chuni_io_config_load(
                 filename);
     }
 
-    cfg->ledstrip_output_pipe = GetPrivateProfileIntW(L"ledstrip", L"billboard_output_pipe", 1, filename);
-    cfg->ledstrip_output_serial = GetPrivateProfileIntW(L"ledstrip", L"billboard_output_serial", 0, filename);
+    cfg->ledstrip_output_pipe = GetPrivateProfileIntW(L"led_output", L"cab_led_output_pipe", 1, filename);
+    cfg->ledstrip_output_serial = GetPrivateProfileIntW(L"led_output", L"cab_led_output_serial", 0, filename);
     
-    cfg->slider_led_output_pipe = GetPrivateProfileIntW(L"ledstrip", L"slider_output_pipe", 1, filename);
-    cfg->slider_led_output_serial = GetPrivateProfileIntW(L"ledstrip", L"slider_output_serial", 0, filename);
+    cfg->slider_led_output_pipe = GetPrivateProfileIntW(L"led_output", L"controller_led_output_pipe", 1, filename);
+    cfg->slider_led_output_serial = GetPrivateProfileIntW(L"led_output", L"controller_led_output_serial", 0, filename);
 
     GetPrivateProfileStringW(
-            L"ledstrip",
+            L"led_output",
             L"serial_port",
             L"COM10",
             output_path_input,
@@ -81,5 +81,5 @@ void chuni_io_config_load(
     wcsncpy(cfg->led_serial_port, L"\\\\.\\", 4);
     wcsncat_s(cfg->led_serial_port, MAX_PATH, output_path_input, MAX_PATH);
     
-    cfg->led_serial_baud = GetPrivateProfileIntW(L"ledstrip", L"serial_baud", 921600, filename);
+    cfg->led_serial_baud = GetPrivateProfileIntW(L"led_output", L"serial_baud", 921600, filename);
 }

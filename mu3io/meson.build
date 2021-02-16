@@ -8,8 +8,20 @@ mu3io_dll = shared_library(
     dependencies : [
         xinput_lib,
     ],
+    link_with : [
+        util_lib
+    ],
     sources : [
+        'config.c',
+        'config.h',
+        'leddata.h',
+        'ledoutput.c',
+        'ledoutput.h',
         'mu3io.c',
         'mu3io.h',
+        'pipeimpl.c',
+        'pipeimpl.h',
+        'serialimpl.c',
+        'serialimpl.h'
     ],
 )

@@ -46,7 +46,7 @@ static_assert(sizeof(struct io4_report_in) == 0x40, "IO4 IN report size");
 struct io4_report_out {
     uint8_t report_id;
     uint8_t cmd;
-    uint8_t payload[62];
+    uint8_t payload[IO4_REPORT_OUT_PAYLOAD_LEN];
 };
 
 static_assert(sizeof(struct io4_report_out) == 0x40, "IO4 OUT report size");
@@ -215,7 +215,7 @@ static HRESULT io4_handle_write(struct irp *irp)
     case IO4_CMD_SET_GENERAL_OUTPUT:
         dprintf("USB I/O: GPIO Out\n");
 
-        return S_OK;
+        return io4_ops->write_gpio(out.payload, IO4_REPORT_OUT_PAYLOAD_LEN);
 
     case IO4_CMD_SET_PWM_OUTPUT:
         dprintf("USB I/O: PWM Out\n");

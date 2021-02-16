@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#define IO4_REPORT_OUT_PAYLOAD_LEN 62
+
 enum {
     /* System buttons in button[0] */
 
@@ -20,6 +22,7 @@ struct io4_state {
 
 struct io4_ops {
     HRESULT (*poll)(void *ctx, struct io4_state *state);
+    HRESULT (*write_gpio)(uint8_t* payload, size_t len);
 };
 
 HRESULT io4_hook_init(const struct io4_ops *ops, void *ctx);

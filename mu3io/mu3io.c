@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "mu3io/mu3io.h"
+#include "mu3io/config.h"
+#include "mu3io/ledoutput.h"
 
 static uint8_t mu3_opbtn;
 static uint8_t mu3_left_btn;
@@ -12,9 +14,23 @@ static uint8_t mu3_right_btn;
 static int16_t mu3_lever_pos;
 static int16_t mu3_lever_xpos;
 
+static struct  mu3_io_config mu3_io_cfg;
+
 HRESULT mu3_io_init(void)
 {
-    return S_OK;
+    mu3_io_config_load(&mu3_io_cfg, L".\\segatools.ini");
+    
+    mu3_led_init_mutex = CreateMutex(
+        NULL,              // default security attributes
+        FALSE,             // initially not owned
+        NULL);             // unnamed mutex
+    
+    if (mu3_led_init_mutex == NULL)
+    {
+        return E_FAIL;
+    }
+
+    return mu3_led_output_init(&mu3_io_cfg);
 }
 
 HRESULT mu3_io_poll(void)
@@ -140,4 +156,9 @@ void mu3_io_get_lever(int16_t *pos)
     if (pos != NULL) {
         *pos = mu3_lever_xpos;
     }
+}
+
+void mu3_io_set_leds(int board, const uint8_t *rgb)
+{
+    mu3_led_output_update(board, rgb);
 }
