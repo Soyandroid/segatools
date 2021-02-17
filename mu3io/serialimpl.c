@@ -10,6 +10,7 @@
 #include "util/dprintf.h"
 
 static HANDLE mu3_serial_port;
+static HANDLE mu3_serial_write_mutex;
 
 HRESULT mu3_led_serial_init(wchar_t led_com[MAX_PATH], DWORD baud)
 {
@@ -54,6 +55,16 @@ HRESULT mu3_led_serial_init(wchar_t led_com[MAX_PATH], DWORD baud)
         return E_FAIL;
     }
 
+    mu3_serial_write_mutex = CreateMutex(
+        NULL,              // default security attributes
+        FALSE,             // initially not owned
+        NULL);             // unnamed mutex
+
+    if (mu3_serial_write_mutex == NULL)
+    {
+        return E_FAIL;
+    }
+
     dprintf("Ongeki Serial LEDs: COM port opened successfully.\n");
 
     return S_OK;
@@ -68,6 +79,11 @@ void mu3_led_serial_update(struct _ongeki_led_data_buf_t* data)
 
     if (mu3_serial_port != INVALID_HANDLE_VALUE) 
     {
+        if (WaitForSingleObject(mu3_serial_write_mutex, INFINITE) != WAIT_OBJECT_0)
+        {
+            return;
+        }
+
         DWORD bytes_written = 0;
 
         BOOL status = WriteFile(
@@ -82,5 +98,7 @@ void mu3_led_serial_update(struct _ongeki_led_data_buf_t* data)
             DWORD last_err = GetLastError();
             dprintf("Ongeki Serial LEDs: Serial port write failed -- %d\n", last_err); 
         }
+
+        ReleaseMutex(mu3_serial_write_mutex);
     } 
 }
