@@ -14,7 +14,7 @@ static struct _ongeki_led_data_buf_t mu3_led_unescaped_buf[LED_BOARDS_TOTAL];
 static struct _ongeki_led_data_buf_t mu3_led_escaped_buf[LED_BOARDS_TOTAL];
 
 static bool mu3_led_output_is_init = false;
-static struct mu3_io_config* mu3_io_config;
+static struct mu3_io_config* config;
 static bool mu3_led_any_outputs_enabled;
 
 HANDLE mu3_led_init_mutex;
@@ -33,7 +33,7 @@ HRESULT mu3_led_output_init(struct mu3_io_config* const cfg)
     
     if (!mu3_led_output_is_init)
     {
-        mu3_io_config = cfg;
+        config = cfg;
         
         // Setup the framing bytes for the packets
         for (int i = 0; i < LED_BOARDS_TOTAL; i++) {
@@ -46,17 +46,17 @@ HRESULT mu3_led_output_init(struct mu3_io_config* const cfg)
             mu3_led_escaped_buf[i].data_len = ongeki_led_board_data_lens[i];
         }
         
-        mu3_led_any_outputs_enabled = mu3_io_config->cab_led_output_pipe || mu3_io_config->controller_led_output_pipe
-            || mu3_io_config->cab_led_output_serial || mu3_io_config->controller_led_output_serial;
+        mu3_led_any_outputs_enabled = config->cab_led_output_pipe || config->controller_led_output_pipe
+            || config->cab_led_output_serial || config->controller_led_output_serial;
         
-        if (mu3_io_config->cab_led_output_pipe || mu3_io_config->controller_led_output_pipe)
+        if (config->cab_led_output_pipe || config->controller_led_output_pipe)
         {
             mu3_led_pipe_init();  // don't really care about errors here tbh
         }
         
-        if (mu3_io_config->cab_led_output_serial || mu3_io_config->controller_led_output_serial)
+        if (config->cab_led_output_serial || config->controller_led_output_serial)
         {
-            mu3_led_serial_init(mu3_io_config->led_serial_port, mu3_io_config->led_serial_baud);
+            mu3_led_serial_init(config->led_serial_port, config->led_serial_baud);
         }
     }
     
@@ -104,12 +104,12 @@ void mu3_led_output_update(int board, const byte* rgb)
     if (board == 0)
     {
         // billboard
-        if (mu3_io_config->cab_led_output_pipe)
+        if (config->cab_led_output_pipe)
         {
             mu3_led_pipe_update(escaped_data);
         }
         
-        if (mu3_io_config->cab_led_output_serial)
+        if (config->cab_led_output_serial)
         {
             mu3_led_serial_update(escaped_data);
         }
@@ -117,12 +117,12 @@ void mu3_led_output_update(int board, const byte* rgb)
     else
     {
         // slider
-        if (mu3_io_config->controller_led_output_pipe)
+        if (config->controller_led_output_pipe)
         {
             mu3_led_pipe_update(escaped_data);
         }
         
-        if (mu3_io_config->controller_led_output_serial)
+        if (config->controller_led_output_serial)
         {
             mu3_led_serial_update(escaped_data);
         }

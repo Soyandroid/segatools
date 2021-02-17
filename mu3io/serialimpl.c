@@ -54,6 +54,8 @@ HRESULT mu3_led_serial_init(wchar_t led_com[MAX_PATH], DWORD baud)
         return E_FAIL;
     }
 
+    dprintf("Ongeki Serial LEDs: COM port opened successfully.\n");
+
     return S_OK;
 }
 
@@ -81,8 +83,4 @@ void mu3_led_serial_update(struct _ongeki_led_data_buf_t* data)
             dprintf("Ongeki Serial LEDs: Serial port write failed -- %d\n", last_err); 
         }
     } 
-    else 
-    {
-        dprintf("Ongeki Serial LEDs: Invalid serial port handle\n"); 
-    }
 }

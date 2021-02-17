@@ -14,7 +14,8 @@ static uint8_t mu3_right_btn;
 static int16_t mu3_lever_pos;
 static int16_t mu3_lever_xpos;
 
-static struct  mu3_io_config mu3_io_cfg;
+static struct mu3_io_config mu3_io_cfg;
+static bool mu3_is_led_output_init = false;
 
 HRESULT mu3_io_init(void)
 {
@@ -30,7 +31,7 @@ HRESULT mu3_io_init(void)
         return E_FAIL;
     }
 
-    return mu3_led_output_init(&mu3_io_cfg);
+    return S_OK;
 }
 
 HRESULT mu3_io_poll(void)
@@ -160,5 +161,11 @@ void mu3_io_get_lever(int16_t *pos)
 
 void mu3_io_set_leds(int board, const uint8_t *rgb)
 {
+    if (!mu3_is_led_output_init)
+    {
+        mu3_led_output_init(&mu3_io_cfg);
+        mu3_is_led_output_init = true;
+    }
+    
     mu3_led_output_update(board, rgb);
 }
