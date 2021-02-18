@@ -6,4 +6,5 @@ EXPORTS
     mu3_io_get_opbtns
     mu3_io_init
     mu3_io_poll
+    mu3_io_ledstrip_init
     mu3_io_set_leds

@@ -5,11 +5,10 @@
 
 #include "amex/amex.h"
 
+#include "board/led1509306.h"
 #include "board/sg-reader.h"
 
 #include "chunihook/slider.h"
-
-#include "chunihook/led1509306.h"
 
 #include "hooklib/gfx.h"
 
@@ -24,7 +23,14 @@ struct chuni_hook_config {
     struct led1509306_config led1509306;
 };
 
-void slider_config_load(struct slider_config *cfg, const wchar_t *filename);
+void slider_config_load(
+    struct slider_config *cfg, 
+    const wchar_t *filename);
+
+void led1509306_config_load(
+    struct led1509306_config *cfg, 
+    const wchar_t *filename);
+
 void chuni_hook_config_load(
         struct chuni_hook_config *cfg,
         const wchar_t *filename);

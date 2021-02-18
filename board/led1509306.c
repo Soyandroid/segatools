@@ -6,12 +6,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "board/led1509306.h"
 #include "board/led1509306-cmd.h"
 #include "board/led1509306-frame.h"
-
-#include "chunihook/led1509306.h"
-
-#include "chuniio/chuniio.h"
 
 #include "hook/iobuf.h"
 #include "hook/iohook.h"
@@ -53,26 +50,34 @@ typedef struct {
 
 _led1509306_per_board_vars led1509306_per_board_vars[led1509306_nboards];
 
-HRESULT led1509306_hook_init(const struct led1509306_config *cfg)
+HRESULT led1509306_hook_init(const struct led1509306_config *cfg, io_ledstrip_init _led_init, 
+    io_ledstrip_set_leds _set_leds, int first_port, int num_boards, uint8_t board_adr, uint8_t host_adr)
 {
     assert(cfg != NULL);
+    assert(_led_init != NULL);
+    assert(_set_leds != NULL);
 
     if (!cfg->enable) {
         return S_FALSE;
     }
+
+    led_init = _led_init;
+    set_leds = _set_leds;
+    led1509306_board_adr = board_adr;
+    led1509306_host_adr = host_adr;
     
     memcpy(led1509306_board_num, cfg->board_number, sizeof(led1509306_board_num));
     memcpy(led1509306_chip_num, cfg->chip_number, sizeof(led1509306_chip_num));
     led1509306_fw_ver = cfg->fw_ver;
     led1509306_fw_sum = cfg->fw_sum;
     
-    for (int i = 0; i < led1509306_nboards; i++)
+    for (int i = 0; i < num_boards; i++)
     {
         _led1509306_per_board_vars *v = &led1509306_per_board_vars[i];
         
         InitializeCriticalSection(&v->lock);
 
-        uart_init(&v->boarduart, 10 + i);
+        uart_init(&v->boarduart, first_port + i);
         v->boarduart.written.bytes = v->written_bytes;
         v->boarduart.written.nbytes = sizeof(v->written_bytes);
         v->boarduart.readable.bytes = v->readable_bytes;
@@ -117,11 +122,11 @@ static HRESULT led1509306_handle_irp_locked(int board, struct irp *irp)
     HRESULT hr;
 
     if (irp->op == IRP_OP_OPEN) {
-        dprintf("Chunithm LED strip: Starting backend DLL\n");
-        hr = chuni_io_ledstrip_init(board);
+        dprintf("LED 1509306: Starting backend DLL\n");
+        hr = led_init(board);
 
         if (FAILED(hr)) {
-            dprintf("Chunithm LED Strip: Backend DLL error: %x\n", (int) hr);
+            dprintf("LED 1509306: Backend DLL error: %x\n", (int) hr);
 
             return hr;
         }
@@ -149,7 +154,7 @@ static HRESULT led1509306_handle_irp_locked(int board, struct irp *irp)
 
         if (hr != S_OK) {
             if (FAILED(hr)) {
-                dprintf("Chunithm LED Strip: Deframe error: %x\n", (int) hr);
+                dprintf("LED 1509306: Deframe error: %x\n", (int) hr);
             }
 
             return hr;
@@ -163,7 +168,7 @@ static HRESULT led1509306_handle_irp_locked(int board, struct irp *irp)
         hr = led1509306_req_dispatch(board, &req);
 
         if (FAILED(hr)) {
-            dprintf("Chunithm LED Strip: Processing error: %x\n", (int) hr);
+            dprintf("LED 1509306: Processing error: %x\n", (int) hr);
         }
     }
 }
@@ -196,7 +201,7 @@ static HRESULT led1509306_req_dispatch(int board, const struct led1509306_req_an
         return led1509306_req_set_timeout(board, req);
 
     default:
-        dprintf("Chunithm LED Strip: Unhandled command %02x\n", req->cmd);
+        dprintf("LED 1509306: Unhandled command %02x\n", req->cmd);
 
         return S_OK;
     }
@@ -204,10 +209,10 @@ static HRESULT led1509306_req_dispatch(int board, const struct led1509306_req_an
 
 static HRESULT led1509306_req_reset(int board, const struct led1509306_req_any *req)
 {
-    dprintf("Chunithm LED Strip: Reset (board %u, type %02x)\n", board, req->payload[0]);
+    dprintf("LED 1509306: Reset (board %u, type %02x)\n", board, req->payload[0]);
     
     if (req->payload[0] != 0xd9)
-        dprintf("Chunithm LED Strip: Warning -- Unknown reset type %02x\n", req->payload[0]);
+        dprintf("LED 1509306: Warning -- Unknown reset type %02x\n", req->payload[0]);
     
     led1509306_per_board_vars[board].enable_response = true;
 
@@ -228,7 +233,7 @@ static HRESULT led1509306_req_reset(int board, const struct led1509306_req_any *
 
 static HRESULT led1509306_req_get_board_info(int board)
 {
-    dprintf("Chunithm LED Strip: Get board info (board %u)\n", board);
+    dprintf("LED 1509306: Get board info (board %u)\n", board);
     
     struct led1509306_resp_board_info resp;
 
@@ -253,7 +258,7 @@ static HRESULT led1509306_req_get_board_info(int board)
 
 static HRESULT led1509306_req_get_fw_sum(int board)
 {
-    dprintf("Chunithm LED Strip: Get firmware checksum (board %u)\n", board);
+    dprintf("LED 1509306: Get firmware checksum (board %u)\n", board);
     
     struct led1509306_resp_any resp;
     
@@ -275,7 +280,7 @@ static HRESULT led1509306_req_get_fw_sum(int board)
 
 static HRESULT led1509306_req_get_protocol_ver(int board)
 {
-    dprintf("Chunithm LED Strip: Get protocol version (board %u)\n", board);
+    dprintf("LED 1509306: Get protocol version (board %u)\n", board);
     
     struct led1509306_resp_any resp;
     
@@ -298,7 +303,7 @@ static HRESULT led1509306_req_get_protocol_ver(int board)
 
 static HRESULT led1509306_req_get_board_status(int board)
 {
-    dprintf("Chunithm LED Strip: Get board status (board %u)\n", board);
+    dprintf("LED 1509306: Get board status (board %u)\n", board);
     
     struct led1509306_resp_any resp;
     
@@ -322,9 +327,9 @@ static HRESULT led1509306_req_get_board_status(int board)
 
 static HRESULT led1509306_req_set_led(int board, const struct led1509306_req_any *req)
 {
-    // dprintf("Chunithm LED Strip: Set LED (board %u)\n", board);
+    // dprintf("LED 1509306: Set LED (board %u)\n", board);
     
-    chuni_io_ledstrip_set_leds(board, req->payload);
+    set_leds(board, req->payload);
 
     if (!led1509306_per_board_vars[board].enable_response)
         return S_OK;
@@ -346,7 +351,7 @@ static HRESULT led1509306_req_set_led(int board, const struct led1509306_req_any
 
 static HRESULT led1509306_req_set_disable_response(int board, const struct led1509306_req_any *req)
 {
-    dprintf("Chunithm LED Strip: Disable LED responses (board %u)\n", board);
+    dprintf("LED 1509306: Disable LED responses (board %u)\n", board);
     
     led1509306_per_board_vars[board].enable_response = !req->payload[0];
 
@@ -369,7 +374,7 @@ static HRESULT led1509306_req_set_disable_response(int board, const struct led15
 
 static HRESULT led1509306_req_set_timeout(int board, const struct led1509306_req_any *req)
 {
-    dprintf("Chunithm LED Strip: Set timeout (board %u)\n", board);
+    dprintf("LED 1509306: Set timeout (board %u)\n", board);
     
     // not actually implemented, but respond correctly anyway
     

@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include "board/io4.h"
+#include "board/led1509306.h"
 #include "board/sg-reader.h"
 #include "board/vfd.h"
 
@@ -12,6 +13,8 @@
 #include "mu3hook/config.h"
 #include "mu3hook/io4.h"
 #include "mu3hook/unity.h"
+
+#include "mu3io/mu3io.h"
 
 #include "platform/platform.h"
 
@@ -43,6 +46,13 @@ static DWORD CALLBACK mu3_pre_startup(void)
             "SDDT",
             "ACA1",
             mu3_hook_mod);
+
+    if (FAILED(hr)) {
+        return hr;
+    }
+
+    hr = led1509306_hook_init(&mu3_hook_cfg.led1509306, 
+        &mu3_io_ledstrip_init, &mu3_io_set_leds, 3, 1, 1, 2);
 
     if (FAILED(hr)) {
         return hr;

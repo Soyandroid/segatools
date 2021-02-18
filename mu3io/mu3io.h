@@ -50,4 +50,6 @@ void mu3_io_get_gamebtns(uint8_t *left, uint8_t *right);
 
 void mu3_io_get_lever(int16_t *pos);
 
+HRESULT mu3_io_ledstrip_init(int board);
+
 void mu3_io_set_leds(int board, const uint8_t *rgb);

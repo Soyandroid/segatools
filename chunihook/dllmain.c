@@ -5,12 +5,12 @@
 
 #include "amex/amex.h"
 
+#include "board/led1509306.h"
 #include "board/sg-reader.h"
 
 #include "chunihook/config.h"
 #include "chunihook/jvs.h"
 #include "chunihook/slider.h"
-#include "chunihook/led1509306.h"
 
 #include "chuniio/chuniio.h"
 
@@ -84,7 +84,8 @@ static DWORD CALLBACK chuni_pre_startup(void)
         return EXIT_FAILURE;
     }
 
-    hr = led1509306_hook_init(&chuni_hook_cfg.led1509306);
+    hr = led1509306_hook_init(&chuni_hook_cfg.led1509306, 
+        &chuni_io_ledstrip_init, &chuni_io_ledstrip_set_leds, 10, 2, 2, 1);
 
     if (FAILED(hr)) {
         return EXIT_FAILURE;

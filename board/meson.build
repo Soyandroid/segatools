@@ -18,6 +18,8 @@ board_lib = static_library(
         'io3.h',
         'io4.c',
         'io4.h',
+        'led1509306.c',
+        'led1509306.h',
         'led1509306-cmd.h',
         'led1509306-frame.c',
         'led1509306-frame.h',

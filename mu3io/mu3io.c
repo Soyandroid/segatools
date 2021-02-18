@@ -15,7 +15,7 @@ static int16_t mu3_lever_pos;
 static int16_t mu3_lever_xpos;
 
 static struct mu3_io_config mu3_io_cfg;
-static bool mu3_is_led_output_init = false;
+// static bool mu3_is_led_output_init = false;
 
 HRESULT mu3_io_init(void)
 {
@@ -159,13 +159,18 @@ void mu3_io_get_lever(int16_t *pos)
     }
 }
 
+HRESULT mu3_io_ledstrip_init(int board)
+{
+    return mu3_led_output_init(&mu3_io_cfg);
+}
+
 void mu3_io_set_leds(int board, const uint8_t *rgb)
 {
-    if (!mu3_is_led_output_init)
+    /*if (!mu3_is_led_output_init)
     {
         mu3_led_output_init(&mu3_io_cfg);
         mu3_is_led_output_init = true;
-    }
+    }*/
     
     mu3_led_output_update(board, rgb);
 }
