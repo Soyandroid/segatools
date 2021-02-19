@@ -180,13 +180,21 @@ static HRESULT aime_io_generate_aime(
     assert(path != NULL);
     assert(digits != NULL);
     assert(nbytes > 0);
-    nbytes = nbytes * 2;
+    nbytes = nbytes;
 
     srand(time(NULL));
 
     for (i = 0 ; i < nbytes ; i++) {
-        digits[i] = rand() % 10;
+        int randomNumber = rand() % 10;
+        int randomNumber2 = rand() % 10;
+        int lowNibble = randomNumber;
+        int highNibble = randomNumber2;
+        digits[i] = (highNibble << 4) + lowNibble;
     }
+
+    /* Aime IDs also seem to need a 0 in their high nibble.
+    At least in my testing. */
+    digits[0] &= 0x0F;
 
     f = _wfopen(path, L"w");
 
@@ -197,7 +205,7 @@ static HRESULT aime_io_generate_aime(
     }
 
     for (i = 0 ; i < nbytes; i++) {
-        fprintf(f, "%d", digits[i]);
+        fprintf(f, "%02X", digits[i]);
     }
 
     fprintf(f, "\n");
